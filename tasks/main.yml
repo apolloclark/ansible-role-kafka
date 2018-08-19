@@ -1,0 +1,112 @@
+---
+# https://kafka.apache.org/quickstart
+# https://kafka.apache.org/downloads
+
+# https://docs.ansible.com/ansible/latest/modules/include_vars_module.html
+- name: Include defaults for configuration, per the requested version.
+  include_vars:
+    file: main-{{ kafka.version }}.yml
+
+# http://docs.ansible.com/ansible/latest/set_fact_module.html
+- name: Merge kafka_default and kafka variables
+  set_fact:
+    kafka_combined: "{{ kafka_defaults | combine(kafka, recursive=True) }}"
+
+# curl http://kafka.apache.org/KEYS | gpg --import
+
+# http://www-us.apache.org/dist/kafka/2.0.0/kafka_2.11-2.0.0.tgz
+# http://www-us.apache.org/dist/kafka/1.1.1/kafka_2.11-1.1.1.tgz
+# https://docs.ansible.com/ansible/2.5/modules/get_url_module.html
+- name: Download tgz
+  get_url:
+    url: "{{ kafka_url }}/{{ kafka_combined.version }}/kafka_{{ kafka_combined.scala_version }}-{{ kafka_combined.version }}.tgz"
+    dest: "/opt/kafka.tgz"
+
+# gpg --verify kafka_2.12-1.0.1.tgz.asc kafka_2.12-1.0.1.tgz
+
+- name: Create kafka group
+  group:
+    name: kafka
+    state: present
+
+# sudo adduser --system --no-create-home --disabled-password --disabled-login kafka
+# https://docs.ansible.com/ansible/latest/modules/user_module.html
+- name: Create kafka user
+  user:
+    name: kafka
+    groups: kafka
+    state: present
+
+# https://docs.ansible.com/ansible/latest/modules/unarchive_module.html
+- name: Unarchive the tgz file
+  unarchive:
+    src: /opt/kafka.tgz
+    dest: /opt
+    remote_src: yes
+
+# https://stackoverflow.com/a/24457830
+# https://docs.ansible.com/ansible/2.5/modules/command_module.html
+- name: Move files to system folder
+  command: mv /opt/kafka_{{ kafka_combined.scala_version }}-{{ kafka_combined.version }}/ /etc/kafka/
+  args:
+    removes: "/opt/kafka_{{ kafka_combined.scala_version }}-{{ kafka_combined.version }}/"
+    creates: "/etc/kakfa"
+
+# https://docs.ansible.com/ansible/latest/modules/file_module.html
+- name: Create directories, set owner, permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: kafka
+    group: kafka
+    mode: 0755
+    recurse: yes
+  with_items:
+    - "/etc/kafka"
+    - "/etc/kafka/data"
+    - "/var/log/kafka"
+
+# http://docs.ansible.com/ansible/latest/template_module.html
+- name: Copy config file
+  template:
+    src: "server.properties"
+    dest: "{{ kafka_combined.config_include_dir }}/server.properties"
+    owner: kafka
+    group: kafka
+    mode: 0755
+  when:
+    - not kafka_combined.install_only
+
+# http://docs.ansible.com/ansible/latest/template_module.html
+- name: Copy systemd service script
+  template:
+    src: "kafka.service"
+    dest: "/etc/systemd/system/kafka.service"
+    owner: root
+    group: root
+    mode: 0644
+
+# http://docs.ansible.com/ansible/latest/service_module.html
+- name: Ensure service auto-starts
+  service:
+    name: kafka
+    enabled: yes
+  when:
+    - not kafka_combined.install_only
+
+# http://docs.ansible.com/ansible/latest/service_module.html
+- name: Restart service
+  service:
+    name: "{{ kafka_combined.daemon }}"
+    state: restarted
+  when:
+    - not kafka_combined.install_only
+
+# http://docs.ansible.com/ansible/latest/service_module.html
+- name: Ensure service is running
+  service: 
+    name: kafka
+    state: started
+    enabled: yes
+  when:
+    - not kafka_combined.install_only
