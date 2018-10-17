@@ -45,6 +45,13 @@
     remote_src: yes
 
 # https://stackoverflow.com/a/24457830
+# https://docs.ansible.com/ansible/latest/modules/file_module.html
+- name: Clean installation folder
+  file:
+    state: absent
+    path: "/etc/kafka"
+
+# https://stackoverflow.com/a/24457830
 # https://docs.ansible.com/ansible/2.5/modules/command_module.html
 - name: Move files to system folder
   command: mv /opt/kafka_{{ kafka_combined.scala_version }}-{{ kafka_combined.version }}/ /etc/kafka/
