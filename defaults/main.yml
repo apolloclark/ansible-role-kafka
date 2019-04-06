@@ -4,5 +4,5 @@ kafka_url: "http://www-us.apache.org/dist/kafka"
 
 # Overload variables using the dict named kafka
 kafka:
-  version: "2.0.0"
+  version: "2.2.0"
   scala_version: "2.11" # 2.12
